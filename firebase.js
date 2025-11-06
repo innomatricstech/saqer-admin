@@ -1,15 +1,11 @@
 // src/firebase.js
-// Modular Firebase v9 setup. Replace values by env vars for production.
-// NOTE: Firebase client config is safe to include in client code, but
-// you should move actual values to environment variables for security
-// and to avoid committing credentials to source control.
-
 import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
-import { getAuth } from "firebase/auth";
 import { getAnalytics, isSupported as analyticsIsSupported } from "firebase/analytics";
 
+/* ---------- Firebase Config ---------- */
 const firebaseConfig = {
   apiKey: "AIzaSyDM2z4RQLDvb-z_XizpMPQcuO9J5fXIvzs",
   authDomain: "saqer-driver-booking-app.firebaseapp.com",
@@ -20,29 +16,28 @@ const firebaseConfig = {
   measurementId: "G-GMEWHEYB6W",
 };
 
+/* ---------- Initialize Firebase ---------- */
 const app = initializeApp(firebaseConfig);
 
-// Firestore
+/* ---------- Core Firebase Services ---------- */
+export const auth = getAuth(app);
 export const db = getFirestore(app);
-
-// Storage
 export const storage = getStorage(app);
 
-// Auth
-export const auth = getAuth(app);
-
-// Optional: analytics (only initialize when supported, avoids errors in SSR/test envs)
+/* ---------- Optional: Firebase Analytics (browser only) ---------- */
 export let analytics = null;
 (async () => {
   try {
     if (await analyticsIsSupported()) {
       analytics = getAnalytics(app);
+      console.log("✅ Firebase Analytics initialized");
+    } else {
+      console.log("⚠️ Analytics not supported in this environment.");
     }
   } catch (err) {
-    // analytics not supported or failed to initialize (safe to ignore)
-    // console.debug("Firebase analytics not initialized:", err);
+    console.warn("⚠️ Analytics initialization failed:", err);
   }
 })();
 
-// Export app as default in case you need it elsewhere
+/* ---------- Export Default App ---------- */
 export default app;

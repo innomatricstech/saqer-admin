@@ -1,46 +1,83 @@
-import { useEffect, useState } from "react";
+// src/pages/Dashboard.jsx
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
-import "../../firebase"
+import { db } from "../../firebase"; // make sure your firebase export matches
 import { FaShoppingCart, FaCalendarDay, FaMoneyBillWave } from "react-icons/fa";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalOrders: 0,
     todaysOrders: 0,
     totalAmount: 0,
   });
+  const [loading, setLoading] = useState(true);
 
+  // redirect if not logged in
   useEffect(() => {
+    const isLoggedIn = localStorage.getItem("isAdminLoggedIn");
+    if (!isLoggedIn) {
+      navigate("/admin-login", { replace: true });
+    }
+  }, [navigate]);
+
+  // fetch bookings & compute stats
+  useEffect(() => {
+    let mounted = true;
+
     const fetchBookings = async () => {
       try {
+        setLoading(true);
         const querySnapshot = await getDocs(collection(db, "BOOKINGS"));
         let totalOrders = 0;
         let todaysOrders = 0;
         let totalAmount = 0;
 
-        const today = new Date().toDateString();
+        const todayStr = new Date().toDateString();
 
         querySnapshot.forEach((doc) => {
-          const data = doc.data();
+          const data = doc.data() || {};
           totalOrders++;
-          totalAmount += data.totalAmount || 0;
 
-          const bookingDate = data.bookingDateTime
-            ? new Date(data.bookingDateTime).toDateString()
-            : null;
+          const amt = Number(data.totalAmount) || 0;
+          totalAmount += amt;
 
-          if (bookingDate === today) {
-            todaysOrders++;
+          // bookingDateTime might be a Firestore Timestamp, ISO string, or Date
+          let bookingDate = null;
+          const raw = data.bookingDateTime;
+
+          if (raw) {
+            if (raw.seconds && typeof raw.seconds === "number") {
+              bookingDate = new Date(raw.seconds * 1000);
+            } else {
+              // try to parse string or Date object
+              bookingDate = new Date(raw);
+            }
+          }
+
+          if (bookingDate && !isNaN(bookingDate.getTime())) {
+            if (bookingDate.toDateString() === todayStr) {
+              todaysOrders++;
+            }
           }
         });
 
-        setStats({ totalOrders, todaysOrders, totalAmount });
+        if (mounted) {
+          setStats({ totalOrders, todaysOrders, totalAmount });
+        }
       } catch (error) {
         console.error("Error fetching bookings:", error);
+      } finally {
+        if (mounted) setLoading(false);
       }
     };
 
     fetchBookings();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const statCards = [
@@ -58,7 +95,7 @@ export default function Dashboard() {
     },
     {
       title: "Total Amount",
-      value: `$${stats.totalAmount.toFixed(2)}`,
+      value: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(stats.totalAmount || 0),
       icon: <FaMoneyBillWave />,
       color: "from-yellow-500 to-orange-500",
     },
@@ -66,9 +103,12 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8 text-gray-800">
-        Dashboard Overview
-      </h1>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">Dashboard Overview</h1>
+          <p className="text-sm text-gray-500 mt-1">Summary of recent activity and key metrics</p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         {statCards.map((card) => (
@@ -80,7 +120,7 @@ export default function Dashboard() {
               {card.icon}
             </div>
             <h3 className="text-lg font-medium mb-1">{card.title}</h3>
-            <p className="text-4xl font-bold">{card.value}</p>
+            <p className="text-4xl font-bold">{loading ? "—" : card.value}</p>
           </div>
         ))}
       </div>

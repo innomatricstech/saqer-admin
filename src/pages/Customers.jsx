@@ -158,9 +158,12 @@ export default function Customers() {
               )}
             </div>
 
-            {/* <Link to="/customers/add" className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg shadow-lg transform-gpu hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300">
-              <Icons.UserPlus size={16} /> Add Customer
-            </Link> */}
+            {/* <-- ADDED: Add Customer button */}
+            <Link to="/customers/add" data-testid="add-customer-btn" className="ml-2">
+              <motion.button whileTap={{ scale: 0.96 }} className="px-4 py-2 rounded-full bg-indigo-600 text-white shadow hover:bg-indigo-700 flex items-center gap-2">
+                <Icons.PlusCircle size={16} /> <span className="text-sm font-medium">Add Customer</span>
+              </motion.button>
+            </Link>
           </div>
         </div>
 
