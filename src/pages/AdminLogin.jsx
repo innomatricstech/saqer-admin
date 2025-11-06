@@ -9,7 +9,7 @@ import {
 import { motion } from "framer-motion";
 import { FiMail, FiLock, FiEye, FiEyeOff } from "react-icons/fi";
 import { auth } from "../../firebase"; // adjust if needed
-import heroImg from "../assets/saqer.png"; // place your image here
+import heroImg from "../assets/saqer.jpeg"; // place your image here
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
@@ -145,15 +145,12 @@ export default function AdminLoginPage() {
           {/* NEW: centered logo above title */}
           <div className="flex flex-col items-center text-center gap-3 mb-6">
             <div className="w-16 h-16 rounded-lg bg-white/80 flex items-center justify-center shadow">
-              <img src={heroImg} alt="logo" className="w-12 h-12 object-contain" />
+              <img src={heroImg} alt="logo" className="w-20 h-20 object-contain" />
             </div>
 
             <div>
               <h1 className="text-lg font-bold text-slate-800 flex items-center justify-center gap-3">
-                Admin
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600">
-                  Panel
-                </span>
+                Admin Panel
               </h1>
             </div>
           </div>
