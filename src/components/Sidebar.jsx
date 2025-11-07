@@ -1,5 +1,4 @@
-// src/components/Sidebar.jsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   FaTachometerAlt,
@@ -7,131 +6,223 @@ import {
   FaCarSide,
   FaGift,
   FaClipboardList,
-  FaCog,
   FaQuestionCircle,
-  FaSignOutAlt,
-  FaChevronDown,
-  FaChevronUp,
+  FaTimes,
 } from "react-icons/fa";
+import { motion, AnimatePresence } from "framer-motion";
+import logo from "../assets/saqer.jpeg"
 
 const menuItems = [
   { label: "Dashboard", path: "/", icon: <FaTachometerAlt /> },
-  {
-    label: "Customers",
-    path: "/customers",
-    icon: <FaUsers />,
-    children: [{ label: "Customers - Vehicles", path: "/customers/vehicles", icon: <FaCarSide /> }],
-  },
+  { label: "Customers", path: "/customers", icon: <FaUsers /> },
   { label: "Drivers", path: "/drivers", icon: <FaCarSide /> },
   { label: "Rewards", path: "/rewards", icon: <FaGift /> },
   { label: "Bookings", path: "/bookings", icon: <FaClipboardList /> },
-  { label: "Settings", path: "/settings", icon: <FaCog /> },
   { label: "Help & Support", path: "/help-support", icon: <FaQuestionCircle /> },
 ];
 
 export default function Sidebar() {
   const location = useLocation();
-  const [openMap, setOpenMap] = useState({});
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const path = location.pathname;
-    const newOpen = {};
-    for (const item of menuItems) {
-      if (item.children) {
-        newOpen[item.label] =
-          path === item.path ||
-          path.startsWith(item.path + "/") ||
-          item.children.some((ch) => path === ch.path || path.startsWith(ch.path + "/") || (ch.path !== "/" && path.startsWith(ch.path)));
-      }
+    function onToggle(e) {
+      if (!e?.detail) return;
+      setMobileOpen(Boolean(e.detail.open));
     }
-    setOpenMap((prev) => ({ ...prev, ...newOpen }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    window.addEventListener("toggle-sidebar", onToggle);
+    return () => window.removeEventListener("toggle-sidebar", onToggle);
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
   }, [location.pathname]);
 
-  const toggle = (label) => setOpenMap((s) => ({ ...s, [label]: !s[label] }));
+  useEffect(() => {
+    const el = document.documentElement;
+    const prev = el.style.overflow;
+    el.style.overflow = mobileOpen ? "hidden" : prev || "";
+    return () => {
+      el.style.overflow = prev || "";
+    };
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Escape") setMobileOpen(false);
+    }
+    if (mobileOpen) window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
+  const drawerVariants = {
+    hidden: { x: "-100%" },
+    visible: { x: 0, transition: { type: "spring", stiffness: 300, damping: 28 } },
+    exit: { x: "-100%", transition: { type: "tween", duration: 0.18 } },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, x: -8 },
+    visible: (i) => ({ opacity: 1, x: 0, transition: { delay: i * 0.04 } }),
+  };
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-gray-100 flex flex-col p-5 shadow-xl z-50">
-      {/* Inner scrollable area so sidebar stays fixed while its content scrolls */}
-      <div className="flex flex-col h-full overflow-y-auto">
-        <div className="mb-8 text-center select-none">
-          <h1 className="text-3xl font-extrabold text-white tracking-wide">Admin<span className="text-blue-400">Hub</span></h1>
-          <p className="text-xs text-gray-400 mt-1">Control Center</p>
-        </div>
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex md:flex-col fixed left-0 top-0 h-full w-64 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-gray-100 p-6 shadow-2xl z-30">
+        <div className="flex flex-col h-full overflow-y-auto">
+          {/* Logo section */}
+          <div className="mb-6 select-none">
+            <div className="flex flex-col items-center gap-3">
+              <img
+                src={logo}
+                alt="Saqer Logo"
+                className="w-28 h-auto object-contain rounded-md shadow-sm bg-white/5"
+              />
+              <h1 className="text-2xl font-extrabold text-white tracking-tight">
+                Saqer<span className="text-blue-300">Service</span>
+              </h1>
+            </div>
+          </div>
 
-        <nav className="space-y-2 flex-1 px-1">
-          {menuItems.map((item) => {
-            if (item.children) {
-              const isOpen = !!openMap[item.label];
-              const parentActive =
-                location.pathname === item.path ||
-                location.pathname.startsWith(item.path + "/") ||
-                item.children.some((ch) => location.pathname === ch.path || location.pathname.startsWith(ch.path + "/") || (ch.path !== "/" && location.pathname.startsWith(ch.path)));
-
+          {/* Navigation */}
+          <nav className="flex-1 space-y-1" aria-label="Main navigation">
+            {menuItems.map((item, idx) => {
+              const isActive = location.pathname === item.path;
               return (
-                <div key={item.label} className="mb-1">
-                  <div className="w-full flex items-center justify-between gap-3 rounded-lg">
-                    <Link
-                      to={item.path}
-                      className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-300 flex-1 ${
-                        parentActive ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "hover:bg-gray-700 text-gray-300 hover:text-white"
-                      }`}
+                <motion.div
+                  key={item.path}
+                  custom={idx}
+                  initial="hidden"
+                  animate="visible"
+                  variants={itemVariants}
+                >
+                  <Link
+                    to={item.path}
+                    className={`group flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 select-none ${
+                      isActive
+                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg"
+                        : "text-slate-200 hover:bg-white/5 hover:translate-x-1"
+                    }`}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <span
+                      className={`p-2 rounded-md bg-white/6 text-lg ${
+                        isActive ? "bg-white/10" : "group-hover:bg-white/8"
+                      } flex items-center justify-center`}
                     >
-                      <span className="text-lg">{item.icon}</span>
-                      <span className="font-medium">{item.label}</span>
-                    </Link>
+                      {item.icon}
+                    </span>
 
-                    <button
-                      onClick={() => toggle(item.label)}
-                      aria-label={`${isOpen ? "Collapse" : "Expand"} ${item.label}`}
-                      className={`ml-2 px-3 py-2 rounded-full transition-colors ${
-                        parentActive ? "bg-blue-600 text-white" : "bg-transparent text-gray-400 hover:bg-gray-700 hover:text-white"
-                      }`}
-                      type="button"
-                    >
-                      {isOpen ? <FaChevronUp /> : <FaChevronDown />}
-                    </button>
-                  </div>
+                    <span className="font-medium">{item.label}</span>
 
-                  {isOpen && (
-                    <div className="mt-2 ml-3 space-y-1">
-                      {item.children.map((child) => {
-                        const isActive = location.pathname === child.path || location.pathname.startsWith(child.path + "/");
-                        return (
-                          <Link
-                            key={child.path}
-                            to={child.path}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors duration-200 ${
-                              isActive ? "bg-blue-500 text-white shadow" : "text-gray-300 hover:bg-gray-700 hover:text-white"
-                            }`}
-                          >
-                            {child.icon && <span className="text-sm">{child.icon}</span>}
-                            <span>{child.label}</span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                    {isActive && (
+                      <span
+                        className="ml-auto w-2 h-8 rounded-full bg-white/20 shadow-inner"
+                        aria-hidden
+                      />
+                    )}
+                  </Link>
+                </motion.div>
               );
-            }
+            })}
+          </nav>
 
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-300 ${
-                  isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" : "hover:bg-gray-700 text-gray-300 hover:text-white"
-                }`}
-              >
-                <span className="text-lg">{item.icon}</span>
-                <span className="font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-    </aside>
+          <div className="mt-6 text-xs text-slate-400">Version 1.0</div>
+        </div>
+      </aside>
+
+      {/* Mobile Drawer */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileOpen(false)}
+              aria-hidden
+            />
+
+            <motion.aside
+              className="fixed top-0 left-0 h-full w-4/5 max-w-xs bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-gray-100 z-50 shadow-2xl flex flex-col p-4"
+              role="dialog"
+              aria-modal="true"
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={drawerVariants}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <img
+                    src="/mnt/data/saqer.jpeg"
+                    alt="Saqer Logo"
+                    className="w-10 h-10 object-contain rounded-md"
+                  />
+                  <h2 className="text-lg font-bold">SaqerService</h2>
+                </div>
+                <button
+                  onClick={() => setMobileOpen(false)}
+                  className="p-2 bg-white/6 rounded-md"
+                  aria-label="Close menu"
+                >
+                  <FaTimes className="w-4 h-4" />
+                </button>
+              </div>
+
+              <nav className="flex-1 space-y-1 overflow-y-auto" aria-label="Mobile navigation">
+                {menuItems.map((item, idx) => {
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <motion.div
+                      key={item.path}
+                      custom={idx}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0, transition: { delay: idx * 0.03 } }}
+                    >
+                      <Link
+                        to={item.path}
+                        onClick={() => setMobileOpen(false)}
+                        className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
+                          isActive
+                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
+                            : "hover:bg-white/5 text-slate-200"
+                        }`}
+                      >
+                        <span className="p-2 rounded-md bg-white/6 text-lg flex items-center justify-center">
+                          {item.icon}
+                        </span>
+                        <span className="font-medium">{item.label}</span>
+                      </Link>
+                    </motion.div>
+                  );
+                })}
+              </nav>
+
+              <div className="border-t border-white/6 pt-4 text-sm text-gray-300">
+                <div className="text-xs text-slate-400">
+                  Need help? Visit Help & Support
+                </div>
+                <Link
+                  to="/help-support"
+                  onClick={() => setMobileOpen(false)}
+                  className="block mt-2 underline"
+                >
+                  Open Support
+                </Link>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      <style>{`
+        @media (max-width: 420px) {
+          aside { width: 78vw; max-width: 260px; }
+        }
+      `}</style>
+    </>
   );
 }

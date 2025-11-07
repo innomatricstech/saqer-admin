@@ -1,6 +1,6 @@
 // src/pages/AddCustomer.jsx
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import * as Icons from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -11,15 +11,20 @@ import {
   doc as firestoreDoc,
 } from "firebase/firestore";
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../../firebase"; // ensure path points to src/firebase.js
+import { db, storage } from "../../firebase"; // <-- ensure path is correct
 
+/* ---------- helpers ---------- */
 function generateReferralCode(length = 7) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
   for (let i = 0; i < length; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
   return s;
 }
+function validateEmail(email) {
+  return /\S+@\S+\.\S+/.test(email);
+}
 
+/* ---------- small animated Field wrapper ---------- */
 const Field = ({ children }) => (
   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }} className="w-full">
     {children}
@@ -28,6 +33,8 @@ const Field = ({ children }) => (
 
 export default function AddCustomer() {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -41,74 +48,77 @@ export default function AddCustomer() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
 
+  /* ---------- preview blob URL management ---------- */
   useEffect(() => {
-    if (file) setPreview(URL.createObjectURL(file));
-    return () => {
-      if (preview) URL.revokeObjectURL(preview);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPreview(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreview(null);
+    }
   }, [file]);
 
-  function validateEmail(email) {
-    return /\S+@\S+\.\S+/.test(email);
-  }
-
-  const onFileChange = (e) => {
+  /* ---------- file change handler ---------- */
+  const handleFileChange = (e) => {
     const f = e.target.files?.[0] || null;
     if (f && f.size > 2 * 1024 * 1024) {
       setError("Image must be smaller than 2MB.");
+      e.target.value = "";
       return;
     }
     setError(null);
     setFile(f);
-    if (f) setForm((s) => ({ ...s, profileImageUrl: "" }));
+    // when picking a file, clear pasted URL to avoid confusion
+    setForm((s) => ({ ...s, profileImageUrl: "" }));
   };
 
-  // improved upload with logs & errors
-  const uploadFileAndGetUrl = async (docId) => {
-    if (!file) return null;
-    try {
-      const sanitizedName = file.name.replace(/\s+/g, "_");
-      const fileRef = storageRef(storage, `customer_profile_images/${docId}_${Date.now()}_${sanitizedName}`);
-      const task = uploadBytesResumable(fileRef, file);
+  const clearFile = () => {
+    setFile(null);
+    setPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
-      return await new Promise((resolve, reject) => {
-        task.on(
-          "state_changed",
-          (snapshot) => {
-            const pct = Math.floor((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-            setProgress(pct);
-            console.log("Upload progress:", pct, "%");
-          },
-          (err) => {
-            console.error("Upload failed:", err);
-            setError("Image upload failed. See console.");
-            reject(err);
-          },
-          async () => {
-            try {
-              const downloadUrl = await getDownloadURL(task.snapshot.ref);
-              console.log("Got download URL:", downloadUrl);
-              resolve(downloadUrl);
-            } catch (gErr) {
-              console.error("getDownloadURL failed:", gErr);
-              setError("Failed to get uploaded image URL.");
-              reject(gErr);
-            }
+  /* ---------- upload helper: uploads `file` and returns download URL ---------- */
+  const uploadFileAndGetUrl = (docId) => {
+    if (!file) return Promise.resolve(null);
+
+    const sanitizedName = file.name.replace(/\s+/g, "_");
+    const path = `customer_profile_images/${docId}_${Date.now()}_${sanitizedName}`;
+    const sRef = storageRef(storage, path);
+    const task = uploadBytesResumable(sRef, file);
+
+    return new Promise((resolve, reject) => {
+      task.on(
+        "state_changed",
+        (snapshot) => {
+          const pct = snapshot.totalBytes ? Math.floor((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+          setProgress(pct);
+        },
+        (err) => {
+          console.error("Upload failed:", err);
+          setError("Image upload failed. Check console / storage rules.");
+          reject(err);
+        },
+        async () => {
+          try {
+            const url = await getDownloadURL(task.snapshot.ref);
+            resolve(url);
+          } catch (gErr) {
+            console.error("getDownloadURL failed:", gErr);
+            setError("Failed to get uploaded image URL.");
+            reject(gErr);
           }
-        );
-      });
-    } catch (err) {
-      console.error("uploadFileAndGetUrl unexpected error", err);
-      setError("Unexpected upload error");
-      return null;
-    }
+        }
+      );
+    });
   };
 
+  /* ---------- submit handler ---------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -124,6 +134,7 @@ export default function AddCustomer() {
 
     setLoading(true);
     setProgress(0);
+
     try {
       const payload = {
         fullName: form.fullName.trim(),
@@ -144,58 +155,54 @@ export default function AddCustomer() {
         createdAt: serverTimestamp(),
       };
 
+      // create the document to get its id (useful for a stable storage path)
       const colRef = collection(db, "customer");
       const docRef = await addDoc(colRef, payload);
-      console.log("Added customer doc:", docRef.id);
+      const docId = docRef.id;
+      console.log("Customer created with id:", docId);
 
-      // upload file (if present) and update the doc
+      // if a file was selected, upload it and patch the doc
       if (file) {
         try {
-          const downloadUrl = await uploadFileAndGetUrl(docRef.id);
+          const downloadUrl = await uploadFileAndGetUrl(docId);
           if (downloadUrl) {
-            await updateDoc(firestoreDoc(db, "customer", docRef.id), { profileImage: downloadUrl });
-            console.log("Updated doc with profileImage:", downloadUrl);
-          } else {
-            console.warn("No downloadUrl returned for file upload.");
+            await updateDoc(firestoreDoc(db, "customer", docId), { profileImage: downloadUrl });
+            console.log("profileImage saved to doc");
           }
         } catch (upErr) {
           console.error("Upload or updateDoc failed:", upErr);
-          setError("Upload failed — check console and Firebase Storage rules.");
+          // don't throw further — customer doc exists; surface error to user
+          setError("Image upload/update failed. Customer created without image.");
         }
       }
 
-      // ensure customerId stored
-      await updateDoc(firestoreDoc(db, "customer", docRef.id), { customerId: docRef.id });
+      // ensure customerId field exists (use the doc id)
+      try {
+        await updateDoc(firestoreDoc(db, "customer", docId), { customerId: docId });
+      } catch (cidErr) {
+        console.warn("Failed to set customerId field:", cidErr);
+      }
 
       setSuccessMessage("Customer added successfully.");
       setTimeout(() => setSuccessMessage(""), 3000);
 
-      // Wait a tick so user sees success; only navigate after complete
-      navigate("/customers");
-    } catch (err) {
-      console.error("Add customer failed:", err);
-      setError("Failed to add customer. Check console and Firestore rules.");
-    } finally {
+      // reset and navigate back
       setLoading(false);
       setFile(null);
       setPreview(null);
       setProgress(0);
+
+      // Because Customers.jsx listens to onSnapshot, it will update automatically.
+      navigate("/customers");
+    } catch (err) {
+      console.error("Add customer failed:", err);
+      setError("Failed to add customer. Check console / Firestore rules.");
+      setLoading(false);
     }
   };
 
-  const RolePill = ({ value }) => (
-    <motion.button
-      whileTap={{ scale: 0.95 }}
-      onClick={() => setForm((s) => ({ ...s, role: value }))}
-      type="button"
-      className={`px-3 py-1 rounded-full text-sm font-medium border ${form.role === value ? "bg-indigo-600 text-white border-transparent" : "bg-white text-slate-700"}`}
-    >
-      {value}
-    </motion.button>
-  );
-
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-4xl mx-auto">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="mb-6">
         <h1 className="text-2xl font-bold">Add Customer</h1>
         <p className="text-sm text-slate-500 mt-1">Create a customer account — clean UI, progressive image upload, and subtle animations.</p>
@@ -220,7 +227,7 @@ export default function AddCustomer() {
               {preview ? (
                 <img src={preview} alt="preview" className="w-full h-full object-cover" />
               ) : form.profileImageUrl ? (
-                <img src={form.profileImageUrl} alt="preview-url" className="w-full h-full object-cover" />
+                <img src={form.profileImageUrl} alt="preview-url" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
               ) : (
                 <div className="text-slate-400 text-xs text-center px-2">
                   <Icons.User size={36} />
@@ -228,7 +235,6 @@ export default function AddCustomer() {
                 </div>
               )}
             </motion.div>
-
             <div className="text-xs text-slate-400 mt-2">Profile preview</div>
           </div>
 
@@ -250,9 +256,16 @@ export default function AddCustomer() {
               <Field>
                 <label className="block text-xs text-slate-600">Role</label>
                 <div className="mt-1 flex gap-2">
-                  <RolePill value="customer" />
-                  <RolePill value="driver" />
-                  <RolePill value="admin" />
+                  {["customer", "driver", "admin"].map((r) => (
+                    <button
+                      type="button"
+                      key={r}
+                      onClick={() => setForm((s) => ({ ...s, role: r }))}
+                      className={`px-3 py-1 rounded-full text-sm font-medium border ${form.role === r ? "bg-indigo-600 text-white border-transparent" : "bg-white text-slate-700"}`}
+                    >
+                      {r}
+                    </button>
+                  ))}
                 </div>
               </Field>
 
@@ -318,8 +331,7 @@ export default function AddCustomer() {
                   onChange={(e) => {
                     setForm((f) => ({ ...f, profileImageUrl: e.target.value }));
                     if (file) {
-                      setFile(null);
-                      setPreview(null);
+                      clearFile();
                     }
                   }}
                   className="mt-1 w-full border rounded px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
@@ -330,7 +342,19 @@ export default function AddCustomer() {
 
               <div>
                 <label className="block text-xs text-slate-600">Upload profile image</label>
-                <input type="file" accept="image/*" onChange={onFileChange} className="mt-1 block w-full text-sm" />
+
+                <div className="mt-1 flex items-center gap-3">
+                  <input ref={fileInputRef} id="profileFile" type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                  <label htmlFor="profileFile" className="cursor-pointer px-4 py-2 rounded border bg-white hover:bg-slate-50">
+                    Choose File
+                  </label>
+
+                  {(file || form.profileImageUrl) && (
+                    <button type="button" onClick={() => { setForm((s) => ({ ...s, profileImageUrl: "" })); clearFile(); }} className="px-3 py-2 rounded border bg-slate-100 hover:bg-slate-200">
+                      Clear
+                    </button>
+                  )}
+                </div>
 
                 {progress > 0 && (
                   <div className="mt-2">
@@ -343,21 +367,21 @@ export default function AddCustomer() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button type="button" onClick={() => navigate(-1)} className="px-4 py-2 rounded-md bg-slate-50 hover:bg-slate-100" disabled={loading}>
-                Cancel
-              </button>
+            <div className="mt-6 flex justify-end gap-3">
+              <Link to="/customers">
+                <button type="button" className="px-4 py-2 rounded-md bg-slate-50 hover:bg-slate-100" disabled={loading}>
+                  Cancel
+                </button>
+              </Link>
 
-              <motion.button whileTap={{ scale: 0.97 }} className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2" type="submit" disabled={loading}>
+              <motion.button whileTap={{ scale: 0.98 }} type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2">
                 {loading ? (
                   <>
-                    <Icons.Loader2 className="animate-spin" size={16} />
-                    <span>Saving...</span>
+                    <Icons.Loader2 className="animate-spin" size={16} /> <span>Saving...</span>
                   </>
                 ) : (
                   <>
-                    <Icons.Check size={16} />
-                    <span>Save Customer</span>
+                    <Icons.Check size={16} /> <span>Save Customer</span>
                   </>
                 )}
               </motion.button>

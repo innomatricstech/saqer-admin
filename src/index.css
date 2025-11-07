@@ -3,66 +3,127 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Put this after your Tailwind imports in index.css */
-
-/* Extra-compact mobile tweaks for <= 480px */
-@media (max-width: 480px) {
-  /* reduce outer padding */
-  .admin-card {
-    padding: 0; /* remove Tailwind internal padding; handled inside */
-  }
-
-  .admin-card .relative {
-    padding: 0.5rem !important;
-  }
-
-  /* shrink logo */
-  .admin-card img {
-    width: 28px !important;
-    height: 28px !important;
-  }
-
-  /* reduce card padding and radius */
-  .admin-card .p-5,
-  .admin-card .p-6,
-  .admin-card .p-8 {
-    padding: 0.6rem !important;
-  }
-
-  /* smaller input padding + font-size */
-  .admin-card input {
-    padding-top: 0.45rem !important;
-    padding-bottom: 0.45rem !important;
-    font-size: 13px !important;
-  }
-
-  .admin-card label {
-    font-size: 11px !important;
-  }
-
-  .admin-card .rounded-2xl {
-    border-radius: 0.5rem !important;
-  }
-
-  .admin-card .gap-3 {
-    gap: 0.4rem !important;
-  }
-
-  .admin-card .mb-5,
-  .admin-card .mb-6 {
-    margin-bottom: 0.5rem !important;
-  }
-
-  .admin-card button[type="submit"] {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
-    font-size: 14px !important;
-  }
-
-  /* reduce decorative blob sizes to avoid overflow */
-  .pointer-events-none.absolute {
-    /* small screens: reduce extreme offsets */
-    transform: translateZ(0);
-  }
+:root{
+  --sidebar-width: 16rem; /* 64 */
+  --sidebar-mobile-width: 78vw;
+  --header-height: 64px;
 }
 
+/* ---------- Global helpers ---------- */
+html, body, #root {
+  height: 100%;
+}
+
+/* Smooth scrolling for internal navs */
+html { scroll-behavior: smooth; }
+
+/* Improve overlay and drawer responsiveness */
+.drawer-overlay {
+  backdrop-filter: blur(2px);
+}
+
+/* Small scrollbar styling (optional) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 9999px; }
+
+/* ---------- Sidebar specific ---------- */
+/* Desktop fixed sidebar replacement when using Tailwind utilities */
+.sidebar-desktop {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+}
+
+/* Make sure sidebar content doesn't get hidden behind header on very small viewports */
+@media (max-width: 1024px) {
+  .sidebar-desktop { transform: translateZ(0); }
+}
+
+/* Mobile drawer width cap and padding tweaks */
+.sidebar-drawer {
+  width: 80vw;
+  max-width: 320px;
+}
+
+/* very tiny screens */
+@media (max-width: 420px) {
+  .sidebar-drawer { width: var(--sidebar-mobile-width); max-width: 260px; }
+  .sidebar-desktop { width: calc(var(--sidebar-mobile-width)); min-width: calc(var(--sidebar-mobile-width)); }
+}
+
+/* Sidebar nav item: ensure tap targets are large enough on mobile */
+.sidebar-item {
+  -webkit-tap-highlight-color: transparent;
+  padding-top: 0.6rem; padding-bottom: 0.6rem; padding-left: 0.9rem; padding-right: 0.9rem;
+  font-size: 0.95rem;
+}
+
+.sidebar-item .icon { font-size: 1.05rem; min-width: 1.05rem }
+
+/* make active link more prominent without breaking layout */
+.sidebar-active {
+  box-shadow: 0 6px 18px rgba(20, 78, 210, 0.18);
+}
+
+/* Ensure the sidebar inner scroll area respects safe-area (iOS) */
+.sidebar-scroll { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ---------- Navbar specific ---------- */
+.header-main { height: var(--header-height); }
+
+/* Title truncation & responsive sizing */
+.header-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Desktop search width control */
+.header-search { width: 18rem; }
+@media (min-width: 768px) and (max-width: 1024px) {
+  .header-search { width: 14rem; }
+}
+@media (max-width: 640px) {
+  .header-search { display: none; }
+}
+
+/* Mobile expanding search container */
+.mobile-search-panel { height: 56px; }
+.mobile-search-input { font-size: 0.95rem; }
+
+/* Avatar & profile area: ensure dropdown aligns and doesn't overflow */
+.profile-dropdown { min-width: 12rem; }
+.profile-dropdown .p-3 { padding: 0.6rem; }
+
+/* Tiny screens tweaks */
+@media (max-width: 420px) {
+  .header-title { font-size: 1rem; }
+  .header-main { padding-top: 0.35rem; padding-bottom: 0.35rem; }
+  .nav-button { padding: 0.35rem; }
+  .avatar-img { width: 34px; height: 34px; }
+}
+
+/* ---------- Accessibility & focus states ---------- */
+:focus { outline: none; }
+.button-focus:focus { box-shadow: 0 0 0 3px rgba(99,102,241,0.18); border-radius: 8px; }
+
+/* Make off-canvas drawer trap focus visually obvious */
+[aria-modal="true"] { -webkit-overflow-scrolling: touch; }
+
+/* ---------- Utility overrides (when combining Tailwind and custom CSS) ---------- */
+/* Ensure high z-index layers for drawer/menus */
+.z-drawer { z-index: 9999; }
+.z-header  { z-index: 9000; }
+
+/* For very small widths we reduce paddings across admin cards (you already had this block) */
+@media (max-width: 480px) {
+  /* Keep using your .admin-card tweaks — these are conservative fallbacks */
+  .admin-card { padding: 0 !important; }
+  .admin-card .p-5, .admin-card .p-6, .admin-card .p-8 { padding: 0.6rem !important; }
+  .admin-card input { padding-top: 0.45rem !important; padding-bottom: 0.45rem !important; font-size: 13px !important; }
+}
+
+/* ---------- Motion & reduced motion preference ---------- */
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
+:root {
+  --sidebar-width: 208px; /* matches w-52 */
+}

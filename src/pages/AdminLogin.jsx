@@ -9,48 +9,21 @@ import {
 import { motion } from "framer-motion";
 import { FiMail, FiLock, FiEye, FiEyeOff } from "react-icons/fi";
 import { auth } from "../../firebase"; // adjust if needed
-import heroImg from "../assets/saqer.jpeg"; // place your image here
+import heroImg from "../assets/saqer.jpeg"; // replace with your image
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
 
-  // form state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
-  // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  // variants (NO hover/rotate variant anymore)
   const cardVariants = {
-    hidden: { opacity: 0, y: 18, scale: 0.995 },
-    enter: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { type: "spring", stiffness: 120, damping: 18 },
-    },
-  };
-
-  const bgFloat = {
-    initial: { scale: 1.02, opacity: 0 },
-    animate: {
-      scale: 1,
-      opacity: 1,
-      transition: {
-        scale: { duration: 6, repeat: Infinity, repeatType: "reverse" },
-        opacity: { duration: 0.8 },
-      },
-    },
-  };
-
-  // Error shake kept (only for error feedback). Remove if you want everything static.
-  const shakeAnim = {
-    x: [0, -8, 8, -6, 6, -3, 3, 0],
-    transition: { duration: 0.6 },
+    hidden: { opacity: 0, y: 10 },
+    enter: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 120, damping: 18 } },
   };
 
   async function onSubmit(e) {
@@ -63,14 +36,8 @@ export default function AdminLoginPage() {
 
     setLoading(true);
     try {
-      // ensure persistence so first-time login persists
       await setPersistence(auth, browserLocalPersistence);
-
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password
-      );
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
 
       setSuccess(true);
       try {
@@ -80,7 +47,7 @@ export default function AdminLoginPage() {
         /* ignore */
       }
 
-      setTimeout(() => navigate("/", { replace: true }), 900);
+      setTimeout(() => navigate("/", { replace: true }), 800);
     } catch (err) {
       console.error("Sign in error:", err);
       if (err?.code === "auth/user-not-found") setError("No user found with this email.");
@@ -90,95 +57,83 @@ export default function AdminLoginPage() {
       else setError(err?.message || "Sign in failed.");
     } finally {
       setLoading(false);
-      setTimeout(() => setSuccess(false), 1400);
+      setTimeout(() => setSuccess(false), 1200);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white overflow-hidden p-6">
-      {/* ambient decorative blobs */}
+    // mobile-first container: safe area, centered
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-safe p-4">
+      {/* decorative blobs hidden on small screens to avoid layout overflow */}
       <motion.div
         aria-hidden
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 0.9, scale: 1 }}
-        transition={{ duration: 1 }}
-        className="pointer-events-none absolute -left-40 -top-36 w-[480px] h-[480px] rounded-full bg-gradient-to-tr from-indigo-400 via-purple-500 to-pink-400 opacity-18"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.9 }}
+        transition={{ duration: 0.9 }}
+        className="hidden md:block pointer-events-none absolute -left-40 -top-36 w-[480px] h-[480px] rounded-full bg-gradient-to-tr from-indigo-400 via-purple-500 to-pink-400 opacity-20"
         style={{ filter: "blur(72px)" }}
       />
       <motion.div
         aria-hidden
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 0.9, scale: 1 }}
-        transition={{ duration: 1.2 }}
-        className="pointer-events-none absolute -right-32 -bottom-28 w-[380px] h-[380px] rounded-full bg-gradient-to-br from-cyan-300 to-indigo-500 opacity-12"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.8 }}
+        transition={{ duration: 1.1 }}
+        className="hidden md:block pointer-events-none absolute -right-32 -bottom-28 w-[380px] h-[380px] rounded-full bg-gradient-to-br from-cyan-300 to-indigo-500 opacity-12"
         style={{ filter: "blur(56px)" }}
       />
 
-      {/* centered single-column card (logo centered above title) */}
+      {/* Card: mobile-first max width is small, scales on larger screens */}
       <motion.div
         variants={cardVariants}
         initial="hidden"
         animate="enter"
-        className="relative z-10 w-full max-w-md bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden"
+        className="relative z-10 w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto bg-white/95 backdrop-blur-sm rounded-2xl shadow-md border border-slate-100 overflow-hidden"
       >
-        {/* subtle background using the hero image, blurred and faint */}
-        <motion.div
-          variants={bgFloat}
-          initial="initial"
-          animate="animate"
-          aria-hidden
-          className="absolute inset-0"
-        >
+        {/* subtle background image inside card (low opacity) */}
+        <div className="absolute inset-0 pointer-events-none">
           <div
-            className="absolute inset-0 bg-cover bg-center"
+            className="absolute inset-0 bg-center bg-cover"
             style={{
               backgroundImage: `url(${heroImg})`,
-              filter: "contrast(0.8) saturate(0.6) blur(8px)",
-              opacity: 0.08,
+              opacity: 0.06,
+              filter: "contrast(0.85) saturate(0.6) blur(6px)",
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/90" />
-        </motion.div>
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/95" />
+        </div>
 
-        {/* content */}
-        <div className="relative p-6 md:p-8">
-          {/* NEW: centered logo above title */}
-          <div className="flex flex-col items-center text-center gap-3 mb-6">
-            <div className="w-16 h-16 rounded-lg bg-white/80 flex items-center justify-center shadow">
-              <img src={heroImg} alt="logo" className="w-20 h-20 object-contain" />
+        <div className="relative px-4 py-6 sm:px-6 sm:py-8">
+          {/* header: logo + title - scales with breakpoints */}
+          <div className="flex flex-col items-center gap-3 mb-4">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-white flex items-center justify-center shadow-sm ring-1 ring-slate-100">
+              <img src={heroImg} alt="logo" className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-md" />
             </div>
 
-            <div>
-              <h1 className="text-lg font-bold text-slate-800 flex items-center justify-center gap-3">
-                Admin Panel
-              </h1>
+            <div className="text-center">
+              <h1 className="text-lg sm:text-xl font-semibold text-slate-800">Admin Panel</h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">Welcome to the admin</p>
             </div>
           </div>
 
-          {/* error */}
           {error && (
-            <motion.div
-              className="mb-4 p-3 rounded-md bg-rose-50 border border-rose-100 text-rose-700 text-sm"
-              animate={shakeAnim}
-              role="alert"
-            >
+            <div className="mb-3 rounded-md bg-rose-50 border border-rose-100 text-rose-700 text-sm p-2">
               {error}
-            </motion.div>
+            </div>
           )}
 
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-3">
             {/* Email */}
             <div>
               <label className="text-xs text-slate-600 mb-1 block">Email</label>
-              <div className="flex items-center gap-3 border rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-300 transition bg-white/70">
-                <FiMail className="text-slate-400" />
+              <div className="flex items-center gap-3 border rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-300 transition bg-white">
+                <FiMail className="text-slate-400 w-4 h-4" />
                 <input
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 text-sm outline-none placeholder-slate-400 bg-transparent"
                   type="email"
-                  placeholder="you@gmail.com"
+                  placeholder="you@example.com"
                   autoComplete="email"
+                  className="flex-1 text-sm sm:text-base outline-none placeholder-slate-400 bg-transparent"
                   required
                 />
               </div>
@@ -187,15 +142,15 @@ export default function AdminLoginPage() {
             {/* Password */}
             <div>
               <label className="text-xs text-slate-600 mb-1 block">Password</label>
-              <div className="flex items-center gap-3 border rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-300 transition bg-white/70">
-                <FiLock className="text-slate-400" />
+              <div className="flex items-center gap-3 border rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-300 transition bg-white">
+                <FiLock className="text-slate-400 w-4 h-4" />
                 <input
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="flex-1 text-sm outline-none placeholder-slate-400 bg-transparent"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   autoComplete="current-password"
+                  className="flex-1 text-sm sm:text-base outline-none placeholder-slate-400 bg-transparent"
                   required
                 />
                 <button
@@ -211,35 +166,30 @@ export default function AdminLoginPage() {
 
             {/* Submit */}
             <div>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.985 }}
+              <button
                 type="submit"
                 disabled={loading || success}
-                className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold shadow-lg disabled:opacity-60"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm sm:text-base font-medium shadow-sm disabled:opacity-60"
               >
-                {loading && (
-                  <svg className="animate-spin -ml-1 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden>
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                {loading ? (
+                  <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                   </svg>
-                )}
-
-                {!loading && !success && <span className="text-sm md:text-base">Login</span>}
-
-                {success && (
-                  <span className="inline-flex items-center gap-2">
-                    <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <motion.path initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4 }} d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span>Log in</span>
-                  </span>
-                )}
-              </motion.button>
+                ) : null}
+                {!loading && !success && <span>Login</span>}
+                {success && <span>Signing you in…</span>}
+              </button>
             </div>
           </form>
+
+          {/* small footer */}
+          <div className="mt-4 text-xs text-center text-slate-400">
+            © {new Date().getFullYear()} Your Company
+          </div>
         </div>
       </motion.div>
     </div>
   );
 }
+ 
