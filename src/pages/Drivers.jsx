@@ -11,7 +11,12 @@ import {
   deleteDoc,
   updateDoc,
 } from "firebase/firestore";
-import { db } from "../../firebase"; // adjust path to your firebase export
+import { db } from "../../firebase"; // adjust path if needed
+
+// import the new request modal (ensure DriverRequest.jsx is in same folder)
+import DriverRequest from "./DriverRequest";
+// import Add Driver modal component
+import AddDrivers from "./AddDrivers";
 
 /* Small gradient generator for avatars */
 function nameToGradient(name = "") {
@@ -76,7 +81,8 @@ function formatValue(v) {
 
 // Custom Status Badge component for better UI and animation
 function StatusBadge({ status, onClick }) {
-  const baseClasses = "px-3 py-1 rounded-full text-xs font-semibold transition-colors duration-150 ease-in-out cursor-pointer hover:shadow-md";
+  const baseClasses =
+    "px-3 py-1 rounded-full text-xs font-semibold transition-colors duration-150 ease-in-out cursor-pointer hover:shadow-md";
   let colorClasses = "";
 
   switch (status) {
@@ -87,11 +93,11 @@ function StatusBadge({ status, onClick }) {
       colorClasses = "bg-slate-100 text-slate-700 hover:bg-slate-200";
       break;
     case "Busy":
-    case "On-Trip": // Combine On-Trip and Busy colors for simplicity in badge
+    case "On-Trip":
       colorClasses = "bg-sky-100 text-sky-700 hover:bg-sky-200";
       break;
     default:
-      colorClasses = "bg-rose-100 text-rose-700 hover:bg-rose-200"; // Pending/Rejected/Approved/Other
+      colorClasses = "bg-rose-100 text-rose-700 hover:bg-rose-200";
   }
 
   return (
@@ -99,15 +105,14 @@ function StatusBadge({ status, onClick }) {
       whileTap={{ scale: 0.95 }}
       whileHover={{ scale: 1.05 }}
       onClick={onClick}
-      className={`${baseClasses} ${colorClasses} flex-shrink-0`} // Added flex-shrink-0
+      className={`${baseClasses} ${colorClasses} flex-shrink-0`}
       title={`Toggle status: currently ${status}`}
-      aria-label={`Change status for driver to ${status === 'Active' ? 'Offline' : 'Active'}`}
+      aria-label={`Change status for driver to ${status === "Active" ? "Offline" : "Active"}`}
     >
       {status}
     </motion.button>
   );
 }
-
 
 /**
  * Drivers page - realtime from Firestore
@@ -119,9 +124,14 @@ export default function Drivers() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // NEW: state to open the DriverRequest modal
+  const [requestOpen, setRequestOpen] = useState(false);
+
+  // NEW: state to open Add Driver modal
+  const [addOpen, setAddOpen] = useState(false);
+
   // Data Fetching via useEffect
   useEffect(() => {
-    // Sort by name as requested by the original code
     const q = query(collection(db, "drivers"), orderBy("name", "asc"));
     const unsub = onSnapshot(
       q,
@@ -132,13 +142,8 @@ export default function Drivers() {
           const phoneRaw = data.mobileNumber || data.phone || data.mobile || "";
           const vehicleRaw = data.vehicle || data.vehicleType || "-";
           const plateRaw =
-            data.licenceNumber ||
-            data.vehicleNo ||
-            data.vehiclePlate ||
-            data.plate ||
-            "-";
-          const joinedRaw =
-            data.createdAt || data.joinedAt || data.updatedProfileAt || null;
+            data.licenceNumber || data.vehicleNo || data.vehiclePlate || data.plate || "-";
+          const joinedRaw = data.createdAt || data.joinedAt || data.updatedProfileAt || null;
           const joinedFormatted = joinedRaw ? formatValue(joinedRaw) : "-";
 
           return {
@@ -172,7 +177,6 @@ export default function Drivers() {
     return () => unsub();
   }, []);
 
-
   const filtered = drivers.filter(
     (d) =>
       d.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -200,18 +204,15 @@ export default function Drivers() {
     if (!d) return;
 
     let newStatus;
-    // Simple toggle between Active and Offline for demo
     if (d.status === "Active") {
       newStatus = "Offline";
     } else if (d.status === "Offline") {
       newStatus = "Active";
     } else {
-      // For all other statuses (Approved, Busy, etc.), switch to Active
       newStatus = "Active";
     }
 
     try {
-      // Use driverStatus field for status updates
       await updateDoc(firestoreDoc(db, "drivers", id), { driverStatus: newStatus });
     } catch (err) {
       console.error("Failed to update status:", err);
@@ -283,25 +284,32 @@ export default function Drivers() {
         tabIndex={0}
       >
         <div className="flex justify-between items-start mb-3 border-b pb-3 min-w-0">
-          <div className="flex items-center gap-3 min-w-0"> {/* Added min-w-0 for truncation safety */}
+          <div className="flex items-center gap-3 min-w-0">
             {driver.driverImage ? (
-              <img src={driver.driverImage} alt={driver.name} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md flex-shrink-0" onError={(e) => e.currentTarget.style.display = 'none'} />
+              <img
+                src={driver.driverImage}
+                alt={driver.name}
+                className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md flex-shrink-0"
+                onError={(e) => (e.currentTarget.style.display = "none")}
+              />
             ) : (
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg bg-gradient-to-br ${nameToGradient(driver.name)} shadow-md flex-shrink-0`}>
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg bg-gradient-to-br ${nameToGradient(
+                  driver.name
+                )} shadow-md flex-shrink-0`}
+              >
                 {driver.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
               </div>
             )}
-            <div className="min-w-0"> {/* Added min-w-0 to the inner div */}
-              <div className="font-semibold text-lg text-slate-800 truncate">{driver.name}</div> {/* Added truncate */}
-              <div className="text-sm text-slate-500 truncate">{driver.phone}</div> {/* Added truncate */}
+            <div className="min-w-0">
+              <div className="font-semibold text-lg text-slate-800 truncate">{driver.name}</div>
+              <div className="text-sm text-slate-500 truncate">{driver.phone}</div>
             </div>
           </div>
           <StatusBadge status={driver.status} onClick={(e) => { e.stopPropagation(); toggleStatus(driver.id); }} />
         </div>
 
-        {/* Enhanced grid for better small-screen responsiveness */}
         <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-sm text-slate-600 mb-3">
-          {/* Vehicle and Plate - Col-span-2 on very small screens, 1 on others */}
           <div className="col-span-2 sm:col-span-1 flex items-center min-w-0">
             <Icons.Truck size={16} className="inline mr-2 text-slate-400 flex-shrink-0" />
             <span className="truncate">{driver.vehicle}</span>
@@ -311,10 +319,9 @@ export default function Drivers() {
             <span className="truncate font-medium text-indigo-700">{driver.plate}</span>
           </div>
 
-          {/* Joined and Email */}
           <div className="col-span-2 sm:col-span-1 flex items-center min-w-0">
             <Icons.Calendar size={16} className="inline mr-2 text-slate-400 flex-shrink-0" />
-            <span className="truncate text-xs sm:text-sm">Joined {driver.joined.split(',')[0]}</span>
+            <span className="truncate text-xs sm:text-sm">Joined {driver.joined.split(",")[0]}</span>
           </div>
           <div className="col-span-2 sm:col-span-1 flex items-center min-w-0">
             <Icons.Mail size={16} className="inline mr-2 text-slate-400 flex-shrink-0" />
@@ -348,6 +355,15 @@ export default function Drivers() {
     );
   }
 
+  // NEW: open requests modal (from inside view modal)
+  const openRequestsForSelected = () => {
+    setRequestOpen(true);
+  };
+  const closeRequests = () => setRequestOpen(false);
+
+  // NEW: open Add Driver modal
+  const openAddDriver = () => setAddOpen(true);
+  const closeAddDriver = () => setAddOpen(false);
 
   return (
     <div className="p-4 sm:p-6 min-h-screen bg-slate-50">
@@ -376,7 +392,7 @@ export default function Drivers() {
               whileTap={{ scale: 0.97 }}
               whileHover={{ scale: 1.02 }}
               className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 font-semibold"
-              onClick={() => alert("Wire up Add Driver modal or route")}
+              onClick={openAddDriver}
               aria-label="Add New Driver"
             >
               <Icons.UserPlus size={18} />
@@ -391,7 +407,8 @@ export default function Drivers() {
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden ring-1 ring-slate-200">
         <div className="px-6 py-4 border-b flex flex-col sm:flex-row items-center justify-between bg-slate-50">
           <div className="text-sm text-slate-500 mb-2 sm:mb-0">
-            Total: <span className="font-bold text-slate-700">{drivers.length}</span> / Showing <span className="font-bold text-slate-700">{filtered.length}</span> results
+            Total: <span className="font-bold text-slate-700">{drivers.length}</span> / Showing{" "}
+            <span className="font-bold text-slate-700">{filtered.length}</span> results
           </div>
           <div className="text-xs text-slate-400 hidden sm:block">Click a row or View button for full details</div>
         </div>
@@ -436,7 +453,7 @@ export default function Drivers() {
                       {/* Driver Name & Vehicle Consolidation */}
                       <td className="px-6 py-4 flex items-center gap-4">
                         {d.driverImage ? (
-                          <img src={d.driverImage} alt={d.name} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-md" onError={(e) => e.currentTarget.style.display = 'none'} />
+                          <img src={d.driverImage} alt={d.name} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-md" onError={(e) => (e.currentTarget.style.display = "none")} />
                         ) : (
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold bg-gradient-to-br ${nameToGradient(d.name)} shadow-md`}>
                             {d.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
@@ -444,7 +461,6 @@ export default function Drivers() {
                         )}
                         <div className="min-w-0 flex-grow">
                           <div className="font-medium text-slate-800 truncate max-w-[200px]">{d.name}</div>
-                          {/* Display Vehicle Type here */}
                           <div className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-0.5">
                             <Icons.Truck size={12} className="text-slate-400" />
                             <span className="truncate max-w-[200px]">{d.vehicle}</span>
@@ -529,9 +545,7 @@ export default function Drivers() {
                 Loading Drivers...
               </div>
             ) : filtered.length > 0 ? (
-              filtered.map((d, idx) => (
-                <MobileDriverCard key={d.id} driver={d} idx={idx} />
-              ))
+              filtered.map((d, idx) => <MobileDriverCard key={d.id} driver={d} idx={idx} />)
             ) : (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-12 text-center text-slate-400">
                 <Icons.Truck size={36} className="mx-auto mb-3 text-slate-300" />
@@ -568,7 +582,11 @@ export default function Drivers() {
             >
               <div className="p-6 border-b flex items-center justify-between bg-slate-50">
                 <div className="flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold ${nameToGradient(selected.name)} bg-gradient-to-br text-lg overflow-hidden flex-shrink-0 shadow-md`}>
+                  <div
+                    className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold ${nameToGradient(
+                      selected.name
+                    )} bg-gradient-to-br text-lg overflow-hidden flex-shrink-0 shadow-md`}
+                  >
                     {selected.driverImage ? (
                       <img src={selected.driverImage} alt={`Profile photo of ${selected.name}`} className="w-full h-full object-cover" />
                     ) : (
@@ -576,7 +594,9 @@ export default function Drivers() {
                     )}
                   </div>
                   <div>
-                    <h2 id="driver-modal-title" className="text-xl font-bold text-slate-800">{selected.name}</h2>
+                    <h2 id="driver-modal-title" className="text-xl font-bold text-slate-800">
+                      {selected.name}
+                    </h2>
                     <div className="text-sm text-slate-500">{selected.email}</div>
                   </div>
                 </div>
@@ -609,8 +629,15 @@ export default function Drivers() {
                         <div className="text-xs font-medium text-slate-500 mb-2">{label}</div>
                         {url ? (
                           <a href={url} target="_blank" rel="noreferrer" className="block" title={`View ${label} in new tab`}>
-                            <img src={url} alt={label} className="w-full h-32 sm:h-44 object-contain rounded-lg bg-slate-100 border border-dashed border-slate-300 transition-opacity duration-300 hover:opacity-80" onError={(e) => e.currentTarget.style.display = 'none'} />
-                            <div className="text-center text-xs text-indigo-500 mt-2 flex items-center justify-center gap-1"><Icons.Maximize2 size={12} /> Enlarge</div>
+                            <img
+                              src={url}
+                              alt={label}
+                              className="w-full h-32 sm:h-44 object-contain rounded-lg bg-slate-100 border border-dashed border-slate-300 transition-opacity duration-300 hover:opacity-80"
+                              onError={(e) => (e.currentTarget.style.display = "none")}
+                            />
+                            <div className="text-center text-xs text-indigo-500 mt-2 flex items-center justify-center gap-1">
+                              <Icons.Maximize2 size={12} /> Enlarge
+                            </div>
                           </a>
                         ) : (
                           <div className="h-32 sm:h-44 flex flex-col items-center justify-center text-slate-400 bg-slate-100 rounded-lg">
@@ -628,13 +655,44 @@ export default function Drivers() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {Object.entries(selected.raw || {}).map(([k, v]) => {
                     // Skip displayed fields
-                    if (["driverImage", "idCardImage", "idCardBackImage", "licenceImage", "licenceBackImage", "name", "fullName", "mobileNumber", "phone", "mobile", "email", "vehicle", "vehicleType", "licenceNumber", "vehicleNo", "vehiclePlate", "plate", "createdAt", "joinedAt", "updatedProfileAt", "driverStatus", "status", "currentStatus", "trips", "totalTrips"].includes(k)) return null;
+                    if (
+                      [
+                        "driverImage",
+                        "idCardImage",
+                        "idCardBackImage",
+                        "licenceImage",
+                        "licenceBackImage",
+                        "name",
+                        "fullName",
+                        "mobileNumber",
+                        "phone",
+                        "mobile",
+                        "email",
+                        "vehicle",
+                        "vehicleType",
+                        "licenceNumber",
+                        "vehicleNo",
+                        "vehiclePlate",
+                        "plate",
+                        "createdAt",
+                        "joinedAt",
+                        "updatedProfileAt",
+                        "driverStatus",
+                        "status",
+                        "currentStatus",
+                        "trips",
+                        "totalTrips",
+                      ].includes(k)
+                    )
+                      return null;
 
                     const display = formatValue(v);
 
                     return (
                       <div key={k} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
-                        <div className="text-xs text-slate-400 font-medium uppercase truncate" title={k}>{k}</div>
+                        <div className="text-xs text-slate-400 font-medium uppercase truncate" title={k}>
+                          {k}
+                        </div>
                         <div className="text-sm text-slate-700 mt-1 break-words font-mono bg-slate-50 p-1 rounded-md">{display}</div>
                       </div>
                     );
@@ -643,29 +701,30 @@ export default function Drivers() {
               </div>
 
               <div className="px-6 py-4 border-t flex justify-end gap-3 bg-slate-50">
+                {/* NEW: Driver Requests button */}
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
+                  whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => alert("Message feature")}
-                  className="px-4 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium transition-colors"
-                  aria-label={`Message ${selected.name}`}
+                  onClick={() => {
+                    openRequestsForSelected();
+                  }}
+                  className="px-4 py-2 rounded-lg bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-medium transition-colors"
+                  aria-label={`Show requests for ${selected.name}`}
                 >
-                  <Icons.MessageSquare size={16} className="inline mr-1" />Message
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => alert("Open trips list")}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-medium shadow-md"
-                  aria-label={`View trip history for ${selected.name}`}
-                >
-                  <Icons.Navigation size={16} className="inline mr-1" />Trips ({selected.trips})
+                  <Icons.ListChecks size={16} className="inline mr-2" />
+                  Driver Requests
                 </motion.button>
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
+
+      {/* DriverRequest modal */}
+      <DriverRequest open={requestOpen} onClose={closeRequests} driver={selected} />
+
+      {/* Add Driver modal */}
+      <AddDrivers open={addOpen} onClose={closeAddDriver} />
     </div>
   );
 }

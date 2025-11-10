@@ -9,7 +9,7 @@ import {
   Navigate,
 } from "react-router-dom";
 
-// Components
+// Layout + Helpers
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./pages/ProtectedRoute";
@@ -26,7 +26,8 @@ import Rewards from "./pages/Rewards";
 import Settings from "./pages/Settings";
 import HelpSupport from "./pages/HelpSupport";
 import AdminLoginPage from "./pages/AdminLogin";
-import Profile from "./pages/Profile"; // ✅ Added
+import Profile from "./pages/Profile";
+import VehicleList from "./pages/VehicleList";
 
 // ---------- LAYOUT COMPONENT ----------
 function Layout() {
@@ -71,15 +72,18 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          {/* Dashboard */}
+          {/* Dashboard (index route inside protected layout) */}
           <Route index element={<Dashboard />} />
 
           {/* Customers */}
           <Route path="customers" element={<Customers />} />
           <Route path="customers/add" element={<AddCustomer />} />
 
-          {/* Add Vehicle */}
+          {/* Add Vehicle (kept as you had it) */}
           <Route path="customers/vehicles/add" element={<AddVehicle />} />
+
+          {/* Vehicles list (new route) */}
+          <Route path="vehicles" element={<VehicleList />} />
 
           {/* Drivers */}
           <Route path="drivers" element={<Drivers />} />
@@ -90,7 +94,7 @@ export default function App() {
           {/* Rewards */}
           <Route path="rewards" element={<Rewards />} />
 
-          {/* Profile (new page) */}
+          {/* Profile */}
           <Route path="profile" element={<Profile />} />
 
           {/* Settings */}
@@ -103,7 +107,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/customers" replace />} />
         </Route>
 
-        {/* Catch-all: redirect unknown routes to login */}
+        {/* Catch-all: redirect unknown public routes to login */}
         <Route path="*" element={<Navigate to="/admin-login" replace />} />
       </Routes>
     </Router>

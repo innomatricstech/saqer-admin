@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaSearch, FaBars, FaTimes } from "react-icons/fa";
+import { FaBars, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -15,19 +15,9 @@ export default function Navbar() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  // Mobile-specific
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const mobileSearchRef = useRef(null);
-
   // Profile dropdown
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
-
-  useEffect(() => {
-    if (mobileSearchOpen && mobileSearchRef.current) {
-      mobileSearchRef.current.focus();
-    }
-  }, [mobileSearchOpen]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -43,7 +33,6 @@ export default function Navbar() {
     function onKey(e) {
       if (e.key === "Escape") {
         setProfileOpen(false);
-        setMobileSearchOpen(false);
         setConfirmOpen(false);
       }
     }
@@ -104,35 +93,10 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* CENTER: Search (desktop large input, mobile icon -> expand) */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="hidden sm:flex items-center relative">
-              <motion.div whileHover={{ scale: 1.01 }} className="relative">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-white/80" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="pl-9 pr-4 py-1.5 md:py-2 rounded-lg text-sm bg-white/12 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/30 w-44 md:w-64 transition-all backdrop-blur-sm"
-                  aria-label="Search"
-                />
-              </motion.div>
-            </div>
+          {/* CENTER: (search removed) keep an empty spacer to center the title visually */}
+          <div className="flex-1" />
 
-            <div className="sm:hidden flex items-center">
-              <motion.button
-                onClick={() => setMobileSearchOpen((s) => !s)}
-                aria-expanded={mobileSearchOpen}
-                aria-label="Open search"
-                whileTap={buttonTap}
-                whileHover={buttonHover}
-                className="p-2 rounded-md bg-white/10 hover:bg-white/20 text-white transition"
-              >
-                {mobileSearchOpen ? <FaTimes className="w-4 h-4" /> : <FaSearch className="w-4 h-4" />}
-              </motion.button>
-            </div>
-          </div>
-
-          {/* RIGHT: Avatar / profile menu (bell removed) */}
+          {/* RIGHT: Avatar / profile menu */}
           <div className="flex items-center gap-2 md:gap-4">
             <div className="relative" ref={profileRef}>
               <motion.button
@@ -197,36 +161,6 @@ export default function Navbar() {
             </div>
           </div>
         </div>
-
-        {/* Mobile search area */}
-        <AnimatePresence>
-          {mobileSearchOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "64px", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22 }}
-              className="sm:hidden px-3 pb-2"
-            >
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.04 }} className="relative">
-                <input
-                  ref={mobileSearchRef}
-                  type="search"
-                  aria-label="Mobile search"
-                  placeholder="Search..."
-                  className="w-full rounded-lg py-3 pl-3 pr-12 text-sm bg-white/95 text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-                <button
-                  onClick={() => setMobileSearchOpen(false)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md"
-                  aria-label="Close search"
-                >
-                  <FaTimes className="w-4 h-4" />
-                </button>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.header>
 
       {/* Logout Confirmation Modal */}
