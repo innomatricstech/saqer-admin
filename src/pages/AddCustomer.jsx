@@ -258,7 +258,7 @@ export default function AddCustomer() {
                 <Field>
                   <label className="block text-[11px] text-slate-600">Role</label>
                   <div className="mt-1 flex gap-2 flex-wrap">
-                    {["customer", "driver", "admin"].map((r) => (
+                    {["customer"].map((r) => (
                       <button
                         key={r}
                         type="button"

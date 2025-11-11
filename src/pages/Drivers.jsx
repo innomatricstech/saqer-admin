@@ -1,5 +1,6 @@
 // src/pages/Drivers.jsx
 import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import * as Icons from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -11,7 +12,7 @@ import {
   deleteDoc,
   updateDoc,
 } from "firebase/firestore";
-import { db } from "../../firebase"; // adjust path if needed
+import { db } from "../../firebase";
 
 // import the new request modal (ensure DriverRequest.jsx is in same folder)
 import DriverRequest from "./DriverRequest";
@@ -79,36 +80,109 @@ function formatValue(v) {
   return String(v);
 }
 
-// Custom Status Badge component for better UI and animation
-function StatusBadge({ status, onClick }) {
-  const baseClasses =
-    "px-3 py-1 rounded-full text-xs font-semibold transition-colors duration-150 ease-in-out cursor-pointer hover:shadow-md";
+// Enhanced Status Badge component with Pending → Approved/Rejected flow
+function StatusBadge({ status, onStatusChange }) {
+  const [showActions, setShowActions] = useState(false);
+
+  const baseClasses = "px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 ease-in-out cursor-pointer";
   let colorClasses = "";
+  let icon = null;
 
   switch (status) {
+    case "Pending":
+      colorClasses = "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300";
+      icon = <Icons.Clock size={12} className="inline mr-1" />;
+      break;
+    case "Approved":
+      colorClasses = "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-300";
+      icon = <Icons.CheckCircle size={12} className="inline mr-1" />;
+      break;
+    case "Rejected":
+      colorClasses = "bg-rose-100 text-rose-700 hover:bg-rose-200 border border-rose-300";
+      icon = <Icons.XCircle size={12} className="inline mr-1" />;
+      break;
     case "Active":
-      colorClasses = "bg-emerald-100 text-emerald-700 hover:bg-emerald-200";
+      colorClasses = "bg-blue-100 text-blue-700 hover:bg-blue-200 border border-blue-300";
+      icon = <Icons.CheckCircle size={12} className="inline mr-1" />;
       break;
     case "Offline":
-      colorClasses = "bg-slate-100 text-slate-700 hover:bg-slate-200";
+      colorClasses = "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300";
+      icon = <Icons.Moon size={12} className="inline mr-1" />;
       break;
     case "Busy":
-    case "On-Trip":
-      colorClasses = "bg-sky-100 text-sky-700 hover:bg-sky-200";
+      colorClasses = "bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-300";
+      icon = <Icons.Clock size={12} className="inline mr-1" />;
       break;
     default:
-      colorClasses = "bg-rose-100 text-rose-700 hover:bg-rose-200";
+      colorClasses = "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300";
   }
 
+  const handleStatusChange = (newStatus) => {
+    setShowActions(false);
+    onStatusChange(newStatus);
+  };
+
+  if (status === "Pending") {
+    return (
+      <div className="relative">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowActions(!showActions)}
+          className={`${baseClasses} ${colorClasses} flex items-center gap-1`}
+          title="Click to approve or reject"
+        >
+          {icon}
+          {status}
+          <Icons.ChevronDown size={10} className="ml-1" />
+        </motion.button>
+
+        <AnimatePresence>
+          {showActions && (
+            <motion.div
+              initial={{ opacity: 0, y: 5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 5, scale: 0.95 }}
+              className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[120px]"
+            >
+              <button
+                onClick={() => handleStatusChange("Approved")}
+                className="w-full text-left px-3 py-2 text-sm text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 rounded-t-lg"
+              >
+                <Icons.CheckCircle size={14} />
+                Approve
+              </button>
+              <button
+                onClick={() => handleStatusChange("Rejected")}
+                className="w-full text-left px-3 py-2 text-sm text-rose-700 hover:bg-rose-50 flex items-center gap-2 rounded-b-lg"
+              >
+                <Icons.XCircle size={14} />
+                Reject
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Close dropdown when clicking outside */}
+        {showActions && (
+          <div
+            className="fixed inset-0 z-0"
+            onClick={() => setShowActions(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // For non-pending statuses, show simple badge with hover effect
   return (
     <motion.button
-      whileTap={{ scale: 0.95 }}
       whileHover={{ scale: 1.05 }}
-      onClick={onClick}
-      className={`${baseClasses} ${colorClasses} flex-shrink-0`}
-      title={`Toggle status: currently ${status}`}
-      aria-label={`Change status for driver to ${status === "Active" ? "Offline" : "Active"}`}
+      whileTap={{ scale: 0.95 }}
+      className={`${baseClasses} ${colorClasses} flex items-center gap-1`}
+      title={`Current status: ${status}`}
     >
+      {icon}
       {status}
     </motion.button>
   );
@@ -118,17 +192,24 @@ function StatusBadge({ status, onClick }) {
  * Drivers page - realtime from Firestore
  */
 export default function Drivers() {
+  const navigate = useNavigate();
   const [drivers, setDrivers] = useState([]);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [statusUpdateLoading, setStatusUpdateLoading] = useState(null);
 
-  // NEW: state to open the DriverRequest modal
+  // State to open the DriverRequest modal
   const [requestOpen, setRequestOpen] = useState(false);
 
-  // NEW: state to open Add Driver modal
+  // State to open Add Driver modal
   const [addOpen, setAddOpen] = useState(false);
+
+  // ADD THIS FUNCTION FOR EDIT NAVIGATION
+  const handleEdit = useCallback((driverId) => {
+    navigate(`/drivers/edit/${driverId}`);
+  }, [navigate]);
 
   // Data Fetching via useEffect
   useEffect(() => {
@@ -146,6 +227,9 @@ export default function Drivers() {
           const joinedRaw = data.createdAt || data.joinedAt || data.updatedProfileAt || null;
           const joinedFormatted = joinedRaw ? formatValue(joinedRaw) : "-";
 
+          // Default status to "Pending" if not set
+          const status = data.driverStatus || data.status || data.currentStatus || "Pending";
+
           return {
             id: d.id,
             name,
@@ -153,7 +237,7 @@ export default function Drivers() {
             email: formatValue(data.email || ""),
             vehicle: formatValue(vehicleRaw),
             plate: formatValue(plateRaw),
-            status: data.driverStatus || data.status || data.currentStatus || "Approved",
+            status: status,
             joined: joinedFormatted,
             trips: Number(data.trips ?? data.totalTrips ?? 0),
             notes: typeof data.notes === "string" ? data.notes : formatValue(data.notes),
@@ -199,24 +283,25 @@ export default function Drivers() {
     }
   };
 
-  const toggleStatus = async (id) => {
-    const d = drivers.find((x) => x.id === id);
-    if (!d) return;
-
-    let newStatus;
-    if (d.status === "Active") {
-      newStatus = "Offline";
-    } else if (d.status === "Offline") {
-      newStatus = "Active";
-    } else {
-      newStatus = "Active";
-    }
-
+  const updateStatus = async (id, newStatus) => {
+    setStatusUpdateLoading(id);
     try {
-      await updateDoc(firestoreDoc(db, "drivers", id), { driverStatus: newStatus });
+      await updateDoc(firestoreDoc(db, "drivers", id), {
+        driverStatus: newStatus,
+        statusUpdatedAt: new Date().toISOString()
+      });
+
+      // Show success notification
+      try {
+        window?.toast?.success?.(`Driver status updated to ${newStatus}`) ||
+          window?.toast?.(`✅ Status updated to ${newStatus}`);
+      } catch { }
+
     } catch (err) {
       console.error("Failed to update status:", err);
       alert("Failed to update status. Check the console for details.");
+    } finally {
+      setStatusUpdateLoading(null);
     }
   };
 
@@ -306,7 +391,19 @@ export default function Drivers() {
               <div className="text-sm text-slate-500 truncate">{driver.phone}</div>
             </div>
           </div>
-          <StatusBadge status={driver.status} onClick={(e) => { e.stopPropagation(); toggleStatus(driver.id); }} />
+          <div onClick={(e) => e.stopPropagation()}>
+            {statusUpdateLoading === driver.id ? (
+              <div className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs flex items-center">
+                <Icons.Loader2 size={12} className="animate-spin mr-1" />
+                Updating...
+              </div>
+            ) : (
+              <StatusBadge
+                status={driver.status}
+                onStatusChange={(newStatus) => updateStatus(driver.id, newStatus)}
+              />
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-y-2 gap-x-3 text-sm text-slate-600 mb-3">
@@ -339,11 +436,24 @@ export default function Drivers() {
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="font-bold text-lg text-indigo-700">{driver.trips}</span>
             <span className="text-sm text-slate-500 hidden sm:inline">Trips</span>
+            
+            {/* ADD EDIT BUTTON IN MOBILE VIEW */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={(e) => { e.stopPropagation(); handleEdit(driver.id); }}
+              className="p-2 rounded-full bg-emerald-50 hover:bg-emerald-100 transition-colors"
+              title="Edit Driver"
+              aria-label={`Edit ${driver.name}`}
+            >
+              <Icons.Edit size={16} className="text-emerald-600" />
+            </motion.button>
+            
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={(e) => { e.stopPropagation(); openView(driver); }}
-              className="p-2 ml-2 rounded-full bg-indigo-50 hover:bg-indigo-100 transition-colors"
+              className="p-2 rounded-full bg-indigo-50 hover:bg-indigo-100 transition-colors"
               title="View Details"
               aria-label={`View details for ${driver.name}`}
             >
@@ -355,13 +465,13 @@ export default function Drivers() {
     );
   }
 
-  // NEW: open requests modal (from inside view modal)
+  // Open requests modal (from inside view modal)
   const openRequestsForSelected = () => {
     setRequestOpen(true);
   };
   const closeRequests = () => setRequestOpen(false);
 
-  // NEW: open Add Driver modal
+  // Open Add Driver modal
   const openAddDriver = () => setAddOpen(true);
   const closeAddDriver = () => setAddOpen(false);
 
@@ -372,6 +482,7 @@ export default function Drivers() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex-shrink-0">
             <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Drivers</h2>
+            <p className="text-sm text-slate-600 mt-1">Manage driver applications and status</p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
@@ -386,6 +497,20 @@ export default function Drivers() {
                 aria-label="Search drivers"
               />
             </div>
+
+            {/* Status Filter */}
+            <select
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-full bg-white text-sm shadow-inner"
+            >
+              <option value="">All Status</option>
+              <option value="Pending">Pending</option>
+              <option value="Approved">Approved</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Active">Active</option>
+              <option value="Offline">Offline</option>
+            </select>
 
             {/* Add Driver Button */}
             <motion.button
@@ -403,6 +528,32 @@ export default function Drivers() {
         </div>
       </header>
 
+      {/* Stats Overview */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl p-4 shadow-lg border border-slate-100">
+          <div className="text-2xl font-bold text-slate-800">{drivers.length}</div>
+          <div className="text-sm text-slate-600">Total Drivers</div>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-lg border border-yellow-100">
+          <div className="text-2xl font-bold text-yellow-600">
+            {drivers.filter(d => d.status === "Pending").length}
+          </div>
+          <div className="text-sm text-slate-600">Pending Review</div>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-lg border border-emerald-100">
+          <div className="text-2xl font-bold text-emerald-600">
+            {drivers.filter(d => d.status === "Approved" || d.status === "Active").length}
+          </div>
+          <div className="text-sm text-slate-600">Approved</div>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-lg border border-rose-100">
+          <div className="text-2xl font-bold text-rose-600">
+            {drivers.filter(d => d.status === "Rejected").length}
+          </div>
+          <div className="text-sm text-slate-600">Rejected</div>
+        </div>
+      </div>
+
       {/* Card/Table Container */}
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden ring-1 ring-slate-200">
         <div className="px-6 py-4 border-b flex flex-col sm:flex-row items-center justify-between bg-slate-50">
@@ -410,7 +561,13 @@ export default function Drivers() {
             Total: <span className="font-bold text-slate-700">{drivers.length}</span> / Showing{" "}
             <span className="font-bold text-slate-700">{filtered.length}</span> results
           </div>
-          <div className="text-xs text-slate-400 hidden sm:block">Click a row or View button for full details</div>
+          <div className="text-xs text-slate-400 hidden sm:block">
+            {drivers.filter(d => d.status === "Pending").length > 0 && (
+              <span className="text-yellow-600 font-medium">
+                {drivers.filter(d => d.status === "Pending").length} drivers pending review
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Desktop Table View (lg and up) */}
@@ -481,8 +638,18 @@ export default function Drivers() {
                         </span>
                       </td>
 
-                      <td className="px-6 py-4 text-center">
-                        <StatusBadge status={d.status} onClick={(e) => { e.stopPropagation(); toggleStatus(d.id); }} />
+                      <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        {statusUpdateLoading === d.id ? (
+                          <div className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs flex items-center justify-center">
+                            <Icons.Loader2 size={12} className="animate-spin mr-1" />
+                            Updating...
+                          </div>
+                        ) : (
+                          <StatusBadge
+                            status={d.status}
+                            onStatusChange={(newStatus) => updateStatus(d.id, newStatus)}
+                          />
+                        )}
                       </td>
 
                       <td className="px-6 py-4 text-center">
@@ -498,10 +665,11 @@ export default function Drivers() {
                             <Icons.Eye size={16} className="text-indigo-600" />
                           </motion.button>
 
+                          {/* UPDATE EDIT BUTTON TO USE handleEdit */}
                           <motion.button
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
-                            onClick={(e) => { e.stopPropagation(); alert("Edit driver - implement flow"); }}
+                            onClick={(e) => { e.stopPropagation(); handleEdit(d.id); }}
                             className="p-2 rounded-full bg-emerald-50 hover:bg-emerald-100 transition-all shadow-sm"
                             title="Edit"
                             aria-label={`Edit details for ${d.name}`}
@@ -556,7 +724,7 @@ export default function Drivers() {
         </div>
       </div>
 
-      {/* View Modal - Remains the same and is highly responsive */}
+      {/* View Modal */}
       <AnimatePresence>
         {open && selected && (
           <>
@@ -601,15 +769,28 @@ export default function Drivers() {
                   </div>
                 </div>
 
-                <motion.button
-                  onClick={closeView}
-                  className="p-2 rounded-full hover:bg-slate-200 transition-colors"
-                  whileHover={{ rotate: 90 }}
-                  title="Close"
-                  aria-label="Close driver detail modal"
-                >
-                  <Icons.X size={20} className="text-slate-600" />
-                </motion.button>
+                <div className="flex items-center gap-3">
+                  {statusUpdateLoading === selected.id ? (
+                    <div className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs flex items-center">
+                      <Icons.Loader2 size={12} className="animate-spin mr-1" />
+                      Updating...
+                    </div>
+                  ) : (
+                    <StatusBadge
+                      status={selected.status}
+                      onStatusChange={(newStatus) => updateStatus(selected.id, newStatus)}
+                    />
+                  )}
+                  <motion.button
+                    onClick={closeView}
+                    className="p-2 rounded-full hover:bg-slate-200 transition-colors"
+                    whileHover={{ rotate: 90 }}
+                    title="Close"
+                    aria-label="Close driver detail modal"
+                  >
+                    <Icons.X size={20} className="text-slate-600" />
+                  </motion.button>
+                </div>
               </div>
 
               <div className="px-6 py-6 overflow-y-auto max-h-[70vh]">
@@ -701,17 +882,32 @@ export default function Drivers() {
               </div>
 
               <div className="px-6 py-4 border-t flex justify-end gap-3 bg-slate-50">
-                {/* NEW: Driver Requests button */}
+                {/* ADD EDIT BUTTON IN MODAL */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    handleEdit(selected.id);
+                    closeView();
+                  }}
+                  className="px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 font-medium transition-colors flex items-center gap-2"
+                  aria-label={`Edit ${selected.name}`}
+                >
+                  <Icons.Edit size={16} />
+                  Edit Driver
+                </motion.button>
+
+                {/* Driver Requests button */}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     openRequestsForSelected();
                   }}
-                  className="px-4 py-2 rounded-lg bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-medium transition-colors"
+                  className="px-4 py-2 rounded-lg bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-medium transition-colors flex items-center gap-2"
                   aria-label={`Show requests for ${selected.name}`}
                 >
-                  <Icons.ListChecks size={16} className="inline mr-2" />
+                  <Icons.ListChecks size={16} />
                   Driver Requests
                 </motion.button>
               </div>

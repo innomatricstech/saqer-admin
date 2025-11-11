@@ -1,243 +1,204 @@
-import React, { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { getDownloadURL, ref as storageRef, uploadBytesResumable, deleteObject } from "firebase/storage";
-import { doc, updateDoc } from "firebase/firestore";
-import { storage, db } from "../../firebase"; // <- adjust path to your firebase init
+// src/pages/Profile.jsx
+import React, { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../../firebase";
 import { useAuth } from "../context/AuthContext";
 
 export default function Profile() {
-  const { admin, loading: authLoading } = useAuth(); // assumes admin.uid, admin.email, admin.name, admin.photoURL
-  const uid = admin?.uid;
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [currentPhoto, setCurrentPhoto] = useState("");
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState("");
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  const inputRef = useRef(null);
+  const { admin, loading: authLoading } = useAuth();
+  const uid = admin?.uid ?? null;
+
+  const [currentPhoto, setCurrentPhoto] = useState(null);
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const [pageLoaded, setPageLoaded] = useState(false);
+
+  // Compact animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1, delayChildren: 0.1 }
+    }
+  };
+
+  const cardVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { type: "spring", stiffness: 100, damping: 15 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 10, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: { type: "spring", stiffness: 100 }
+    }
+  };
 
   useEffect(() => {
-    if (admin) {
-      setName(admin.name || "");
-      setEmail(admin.email || "");
-      setCurrentPhoto(admin.photoURL || "");
-    }
+    if (admin) setCurrentPhoto(admin.photoURL || null);
+    const timer = setTimeout(() => setPageLoaded(true), 50);
+    return () => clearTimeout(timer);
   }, [admin]);
 
-  useEffect(() => {
-    if (!file) {
-      setPreview("");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setPreview(reader.result);
-    reader.readAsDataURL(file);
-    return () => {
-      reader.abort && reader.abort();
-    };
-  }, [file]);
+  const handleImageLoad = () => setIsImageLoaded(true);
 
   if (authLoading) {
-    return <div className="p-6">Loading...</div>;
-  }
-
-  async function handleUpload(e) {
-    e.preventDefault();
-    setMsg("");
-    if (!uid) return setMsg("No admin user found.");
-    if (!file) return setMsg("Please choose an image to upload.");
-
-    setBusy(true);
-    setUploadProgress(0);
-    try {
-      // Create a storage reference
-      // Use a folder like `admins/{uid}/profile.jpg` so each admin has their own path
-      const ext = file.name.split(".").pop();
-      const storagePath = `admins/${uid}/profile.${ext}`;
-      const sRef = storageRef(storage, storagePath);
-
-      // Upload with resumable to get progress
-      const uploadTask = uploadBytesResumable(sRef, file);
-
-      // Listen for progress
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-          setUploadProgress(pct);
-        },
-        (error) => {
-          console.error("Upload failed:", error);
-          setMsg("Upload failed. Try again.");
-          setBusy(false);
-        },
-        async () => {
-          // Completed — get URL
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-
-          // Update Firestore admins/{uid}
-          await updateDoc(doc(db, "admins", uid), {
-            photoURL: downloadURL,
-            // optionally update name: name
-          });
-
-          setCurrentPhoto(downloadURL);
-          setPreview("");
-          setFile(null);
-          setMsg("Profile photo updated.");
-          setBusy(false);
-          setUploadProgress(0);
-        }
-      );
-    } catch (err) {
-      console.error(err);
-      setMsg("Unexpected error. Check console.");
-      setBusy(false);
-    }
-  }
-
-  // Optional: remove current photo from storage (if you want)
-  async function handleRemovePhoto() {
-    if (!uid || !currentPhoto) return;
-    try {
-      setBusy(true);
-      // Attempt to delete the object by deriving storage ref from the URL.
-      // NOTE: deleting via get path is safer if you stored the storage path as well.
-      // Here we attempt to create a ref to the exact file path used earlier.
-      // If you used `admins/${uid}/profile.ext` earlier you can build the path.
-      // For simplicity, we'll update Firestore photoURL to null and leave deletion for manual handling.
-      await updateDoc(doc(db, "admins", uid), { photoURL: null });
-      setCurrentPhoto("");
-      setMsg("Photo removed (Firestore updated).");
-    } catch (err) {
-      console.error("Remove error:", err);
-      setMsg("Could not remove photo.");
-    } finally {
-      setBusy(false);
-    }
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+            className="w-12 h-12 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"
+          />
+          <p className="text-sm text-slate-600">Loading...</p>
+        </motion.div>
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-6 px-4">
+      {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
+        initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="bg-white rounded-2xl shadow p-6 border"
+        className="text-center mb-8"
       >
-        <h2 className="text-lg font-semibold mb-4">Profile</h2>
+        <motion.h1
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2"
+        >
+          Admin Profile
+        </motion.h1>
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: "60px" }}
+          transition={{ delay: 0.4 }}
+          className="h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mx-auto"
+        />
+      </motion.div>
 
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Left: avatar & upload */}
-          <div className="w-full md:w-1/3 flex flex-col items-center">
-            <div className="w-36 h-36 rounded-full overflow-hidden bg-slate-100 flex items-center justify-center mb-3">
-              <img
-                src={preview || currentPhoto || "/images/saqer.jpeg"}
-                alt="avatar"
-                className="w-full h-full object-cover"
-              />
-            </div>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate={pageLoaded ? "visible" : "hidden"}
+        className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6"
+      >
+        {/* Profile Picture Card */}
+        <motion.div
+          variants={cardVariants}
+          className="bg-white/90 rounded-2xl shadow-lg border border-white/50 p-6"
+        >
+          <motion.h2
+            variants={itemVariants}
+            className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"
+          >
+            <div className="w-2 h-2 bg-blue-500 rounded-full" />
+            Profile Picture
+          </motion.h2>
 
-            <div className="w-full">
-              <label className="block text-xs text-slate-600 mb-1">Change profile photo</label>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                onChange={(ev) => {
-                  const f = ev.target.files?.[0];
-                  if (f) setFile(f);
-                }}
-                className="text-sm"
-                disabled={busy}
-              />
-
-              {file && (
-                <div className="mt-3">
-                  <div className="text-xs text-slate-500 mb-2">Preview:</div>
-                  <div className="w-full bg-slate-50 p-2 rounded">
-                    <img src={preview} alt="preview" className="w-full h-36 object-contain" />
-                  </div>
-                </div>
-              )}
-
-              {uploadProgress > 0 && (
-                <div className="w-full mt-3">
-                  <div className="h-2 bg-slate-200 rounded overflow-hidden">
-                    <div className="h-full bg-blue-600" style={{ width: `${uploadProgress}%` }} />
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">{uploadProgress}%</div>
-                </div>
-              )}
-
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={handleUpload}
-                  disabled={busy || !file}
-                  className="px-3 py-2 rounded bg-blue-600 text-white text-sm disabled:opacity-60"
-                >
-                  {busy ? "Uploading..." : "Upload"}
-                </button>
-
-                <button
-                  onClick={() => {
-                    setFile(null);
-                    setPreview("");
-                    if (inputRef.current) inputRef.current.value = "";
-                    setMsg("");
-                  }}
-                  disabled={busy}
-                  className="px-3 py-2 rounded border text-sm"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  onClick={handleRemovePhoto}
-                  disabled={busy || !currentPhoto}
-                  className="px-3 py-2 rounded border text-sm text-rose-600 disabled:opacity-60"
-                >
-                  Remove
-                </button>
-              </div>
-
-              {msg && <div className="mt-3 text-sm text-slate-600">{msg}</div>}
-            </div>
-          </div>
-
-          {/* Right: info */}
-          <div className="flex-1">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setMsg("Name update not implemented here. Implement if needed.");
-              }}
-              className="space-y-3"
+          <div className="flex flex-col items-center space-y-4">
+            <motion.div
+              variants={itemVariants}
+              className="relative"
             >
-              <div>
-                <label className="block text-xs text-slate-600">Name</label>
-                <input
-                  className="mt-1 w-full rounded border px-3 py-2"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+              <div className="w-32 h-32 rounded-xl bg-gradient-to-br from-blue-100 to-purple-100 border-2 border-white shadow-md flex items-center justify-center overflow-hidden">
+                <AnimatePresence mode="wait">
+                  {currentPhoto ? (
+                    <motion.img
+                      key="profile-image"
+                      initial={{ opacity: 0, scale: 1.1 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      src={currentPhoto}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onLoad={handleImageLoad}
+                    />
+                  ) : (
+                    <motion.div
+                      key="placeholder"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-blue-400 flex flex-col items-center gap-2"
+                    >
+                      <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center">
+                        <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-slate-500">No photo</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
+            </motion.div>
 
-              <div>
-                <label className="block text-xs text-slate-600">Email</label>
-                <input className="mt-1 w-full rounded border px-3 py-2 bg-slate-50" value={email} disabled />
-              </div>
-
-              <div className="pt-2">
-                <button type="submit" className="px-4 py-2 rounded bg-amber-500 text-white">
-                  Save (placeholder)
-                </button>
-              </div>
-            </form>
+            <motion.p
+              variants={itemVariants}
+              className="text-xs text-slate-500 text-center max-w-xs"
+            >
+              Profile picture synced with authentication provider
+            </motion.p>
           </div>
-        </div>
+        </motion.div>
+
+        {/* Account Info Card */}
+        <motion.div
+          variants={cardVariants}
+          className="bg-white/90 rounded-2xl shadow-lg border border-white/50 p-6"
+        >
+          <motion.h2
+            variants={itemVariants}
+            className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2"
+          >
+            <div className="w-2 h-2 bg-green-500 rounded-full" />
+            Account Information
+          </motion.h2>
+
+          <motion.div variants={itemVariants} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1 uppercase tracking-wide">
+                Full Name
+              </label>
+              <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 text-slate-800 text-sm">
+                {admin?.name || "Not set"}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1 uppercase tracking-wide">
+                Email Address
+              </label>
+              <div className="p-2 bg-slate-50 rounded-lg border border-slate-200 text-slate-800 text-sm">
+                {admin?.email || "Not set"}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1 uppercase tracking-wide">
+                User ID
+              </label>
+              <div className="p-2 bg-slate-50 rounded-lg border border-slate-200">
+                <code className="text-xs text-slate-600 break-all font-mono">
+                  {uid}
+                </code>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
       </motion.div>
     </div>
   );

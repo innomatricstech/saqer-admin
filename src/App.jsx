@@ -9,18 +9,16 @@ import {
   Navigate,
 } from "react-router-dom";
 
-// Layout + Helpers
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./pages/ProtectedRoute";
-
-// Pages
 import CreateAdmin from "./pages/CreateAdmin";
 import Dashboard from "./pages/Dashboard";
 import Customers from "./pages/Customers";
 import AddCustomer from "./pages/AddCustomer";
 import AddVehicle from "./pages/AddVehicle";
 import Drivers from "./pages/Drivers";
+import DriversEdit from "./pages/DriversEdit"; // ADD THIS IMPORT
 import Bookings from "./pages/Bookings";
 import Rewards from "./pages/Rewards";
 import Settings from "./pages/Settings";
@@ -55,7 +53,6 @@ function Layout() {
   );
 }
 
-// ---------- MAIN APP ROUTING ----------
 export default function App() {
   return (
     <Router>
@@ -87,6 +84,8 @@ export default function App() {
 
           {/* Drivers */}
           <Route path="drivers" element={<Drivers />} />
+          {/* ADD DRIVERS EDIT ROUTE */}
+          <Route path="drivers/edit/:driverId" element={<DriversEdit />} />
 
           {/* Bookings */}
           <Route path="bookings" element={<Bookings />} />

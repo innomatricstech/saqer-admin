@@ -23,7 +23,11 @@ export default function AdminLoginPage() {
 
   const cardVariants = {
     hidden: { opacity: 0, y: 10 },
-    enter: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 120, damping: 18 } },
+    enter: {
+      opacity: 1,
+      y: 0,
+      transition: { type: "spring", stiffness: 120, damping: 18 },
+    },
   };
 
   async function onSubmit(e) {
@@ -37,7 +41,11 @@ export default function AdminLoginPage() {
     setLoading(true);
     try {
       await setPersistence(auth, browserLocalPersistence);
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
 
       setSuccess(true);
       try {
@@ -50,8 +58,10 @@ export default function AdminLoginPage() {
       setTimeout(() => navigate("/", { replace: true }), 800);
     } catch (err) {
       console.error("Sign in error:", err);
-      if (err?.code === "auth/user-not-found") setError("No user found with this email.");
-      else if (err?.code === "auth/wrong-password") setError("Incorrect password.");
+      if (err?.code === "auth/user-not-found")
+        setError("No user found with this email.");
+      else if (err?.code === "auth/wrong-password")
+        setError("Incorrect password.");
       else if (err?.code === "auth/too-many-requests")
         setError("Too many attempts — try again later.");
       else setError(err?.message || "Sign in failed.");
@@ -62,15 +72,14 @@ export default function AdminLoginPage() {
   }
 
   return (
-    // mobile-first container: safe area, centered
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-safe p-4">
-      {/* decorative blobs hidden on small screens to avoid layout overflow */}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white p-safe px-4 py-8">
+      {/* Decorative blobs: hidden on small screens to avoid overflow */}
       <motion.div
         aria-hidden
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.9 }}
         transition={{ duration: 0.9 }}
-        className="hidden md:block pointer-events-none absolute -left-40 -top-36 w-[480px] h-[480px] rounded-full bg-gradient-to-tr from-indigo-400 via-purple-500 to-pink-400 opacity-20"
+        className="hidden lg:block pointer-events-none absolute -left-40 -top-36 w-[480px] h-[480px] rounded-full bg-gradient-to-tr from-indigo-400 via-purple-500 to-pink-400 opacity-20"
         style={{ filter: "blur(72px)" }}
       />
       <motion.div
@@ -78,21 +87,22 @@ export default function AdminLoginPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.8 }}
         transition={{ duration: 1.1 }}
-        className="hidden md:block pointer-events-none absolute -right-32 -bottom-28 w-[380px] h-[380px] rounded-full bg-gradient-to-br from-cyan-300 to-indigo-500 opacity-12"
+        className="hidden lg:block pointer-events-none absolute -right-32 -bottom-28 w-[380px] h-[380px] rounded-full bg-gradient-to-br from-cyan-300 to-indigo-500 opacity-12"
         style={{ filter: "blur(56px)" }}
       />
 
-      {/* Card: mobile-first max width is small, scales on larger screens */}
+      {/* Card container: full width on small screens, constrained on larger */}
       <motion.div
         variants={cardVariants}
         initial="hidden"
         animate="enter"
-        className="relative z-10 w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto bg-white/95 backdrop-blur-sm rounded-2xl shadow-md border border-slate-100 overflow-hidden"
+        className="relative z-10 w-full max-w-xl md:max-w-md bg-white/95 backdrop-blur-sm rounded-2xl shadow-md border border-slate-100 overflow-hidden"
+        style={{ minWidth: 0 }}
       >
-        {/* subtle background image inside card (low opacity) */}
+        {/* subtle background image inside card (low opacity) - hide on very small screens */}
         <div className="absolute inset-0 pointer-events-none">
           <div
-            className="absolute inset-0 bg-center bg-cover"
+            className="absolute inset-0 bg-center bg-cover hidden sm:block"
             style={{
               backgroundImage: `url(${heroImg})`,
               opacity: 0.06,
@@ -103,18 +113,28 @@ export default function AdminLoginPage() {
         </div>
 
         <div className="relative px-4 py-6 sm:px-6 sm:py-8">
-          {/* header: logo + title - scales with breakpoints */}
+          {/* header: logo + title - scales down on mobile */}
           <div className="flex flex-col items-center gap-3 mb-4">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-white flex items-center justify-center shadow-sm ring-1 ring-slate-100">
-              <img src={heroImg} alt="logo" className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-md" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-white flex items-center justify-center shadow-sm ring-1 ring-slate-100">
+              {/* hide big logo on very small screens by shrinking it */}
+              <img
+                src={heroImg}
+                alt="logo"
+                className="w-12 h-12 sm:w-16 sm:h-16 object-contain rounded-md"
+              />
             </div>
 
             <div className="text-center">
-              <h1 className="text-lg sm:text-xl font-semibold text-slate-800">Admin Panel</h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">Welcome to the admin</p>
+              <h1 className="text-lg sm:text-xl font-semibold text-slate-800">
+                Admin Panel
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                Welcome to the admin
+              </p>
             </div>
           </div>
 
+          {/* error box */}
           {error && (
             <div className="mb-3 rounded-md bg-rose-50 border border-rose-100 text-rose-700 text-sm p-2">
               {error}
@@ -135,6 +155,7 @@ export default function AdminLoginPage() {
                   autoComplete="email"
                   className="flex-1 text-sm sm:text-base outline-none placeholder-slate-400 bg-transparent"
                   required
+                  inputMode="email"
                 />
               </div>
             </div>
@@ -172,18 +193,34 @@ export default function AdminLoginPage() {
                 className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm sm:text-base font-medium shadow-sm disabled:opacity-60"
               >
                 {loading ? (
-                  <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  <svg
+                    className="animate-spin h-4 w-4 text-white"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
                   </svg>
                 ) : null}
                 {!loading && !success && <span>Login</span>}
-                {success && <span>Signing you in…</span>}
+                {success && <span>Logged in…</span>}
               </button>
             </div>
           </form>
 
-          {/* small footer */}
+          {/* small footer - stacked on small screens */}
           <div className="mt-4 text-xs text-center text-slate-400">
             © {new Date().getFullYear()} Your Company
           </div>
@@ -192,4 +229,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
- 
